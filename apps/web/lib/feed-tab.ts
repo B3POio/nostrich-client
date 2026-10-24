@@ -1,6 +1,6 @@
 /** The feed tab vocabulary, and the rule that decides which one a reader lands. */
 
-export type FeedTabId = 'follows' | 'latest' | 'trending' | 'custom'
+export type FeedTabId = 'follows' | 'latest' | 'trending' | 'custom' | 'list'
 
 export function tabFromParam(raw: string | null): FeedTabId | null {
   switch (raw) {
@@ -12,6 +12,8 @@ export function tabFromParam(raw: string | null): FeedTabId | null {
       return 'trending'
     case 'custom':
       return 'custom'
+    case 'list':
+      return 'list'
     case 'latest':
     // `verified`, `discover` and `global` all shipped at some point.
     case 'verified':
@@ -28,6 +30,7 @@ export function resolveTab({
   requested,
   signedIn,
   customMissing,
+  listMissing = false,
   hasFollows,
 }: {
   /** The `feed` URL parameter, already normalised. */
@@ -35,6 +38,8 @@ export function resolveTab({
   signedIn: boolean
   /** A `custom` route naming a feed this device does. */
   customMissing: boolean
+  /** A `list` route naming a list nobody could find. */
+  listMissing?: boolean
   /** Whether the reader has a contact list. */
   hasFollows: boolean
 }): FeedTabId {
@@ -43,6 +48,7 @@ export function resolveTab({
 
   /* An EXPLICIT request always wins, including a signed-out reader asking for Latest. */
   if (requested === 'custom') return customMissing ? fallback : 'custom'
+  if (requested === 'list') return listMissing ? fallback : 'list'
   if (requested === 'follows' && !signedIn) return fallback
   if (requested !== null) return requested
   return signedIn && hasFollows ? 'follows' : fallback

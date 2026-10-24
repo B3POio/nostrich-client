@@ -170,3 +170,28 @@ export function NewChatIcon({
 
 /** The two looping arrows, the same path the action row's repost button draws. */
 export { PATHS as ACTION_PATHS } from '@nostrich/app/src/components/icon-paths'
+
+/** The plus inside the action pill. */
+export function PlusGlyph(): React.ReactNode {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className="size-[15px]">
+      <path fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" d="M8 3.2v9.6M12.8 8H3.2" />
+    </svg>
+  )
+}
+
+/** A small padlock, for what only the reader can see. */
+export function LockGlyph({ className = 'size-[13px]' }: { className?: string } = {}): React.ReactNode {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden="true" className={className}>
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M4.5 7.2h7a1 1 0 0 1 1 1v4.6a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1V8.2a1 1 0 0 1 1-1ZM5.6 7.2V5.4a2.4 2.4 0 0 1 4.8 0v1.8"
+      />
+    </svg>
+  )
+}

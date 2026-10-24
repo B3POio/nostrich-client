@@ -26,6 +26,8 @@ const SIGNED_KINDS = [
   /** NIP-78 app data. */
   30078,
   30023, // long-form articles, ArticleEditor publishes these.
+  30000, // people lists (NIP-51 follow sets)
+  39089, // follow packs
 ] as const
 
 /** Kinds deliberately NOT requested, so nobody adds them speculatively: - **1059**. */

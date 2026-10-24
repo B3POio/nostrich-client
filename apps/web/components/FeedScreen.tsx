@@ -12,7 +12,7 @@ import { useCustomFeeds, type CustomFeed } from '../lib/custom-feeds'
 import { useFeed, withSelf, type FeedSource } from '../lib/feed'
 import { getCachedEvent } from '../lib/event-cache'
 import { pluralize } from '../lib/format'
-import { normalizeHashtag, noteHref } from '../lib/links'
+import { listFromParam, normalizeHashtag, noteHref } from '../lib/links'
 import { useInteractions } from '../lib/interactions'
 import { nextAuthors } from '../lib/stable-authors'
 import { mergeTrendingCounts } from '../lib/trending-counts'
@@ -46,6 +46,8 @@ import { useNowSeconds } from './Clock'
 import { NoteCard } from './NoteCard'
 import { hasStoredSession } from '../lib/session-storage'
 import { sessionPubkey, useSession } from './SessionProvider'
+import { entryMembers, entryPrivacy, privateUnread, usePeopleLists, usePeopleListAt } from '../lib/people-lists'
+import { LockGlyph } from './icons'
 
 /** Rows actually mounted. */
 const RENDER_CAP = 600
@@ -74,7 +76,7 @@ function windowFromParam(raw: string | null): TrendingWindowId {
 
 const EMPTY_EVENTS: NostrEvent[] = []
 
-function hrefFor(tab: Exclude<FeedTabId, 'custom'>, window?: TrendingWindowId): string {
+function hrefFor(tab: Exclude<FeedTabId, 'custom' | 'list'>, window?: TrendingWindowId): string {
   return tab === 'trending' ? `/?feed=trending&w=${window ?? DEFAULT_WINDOW}` : `/?feed=${tab}`
 }
 
@@ -165,10 +167,27 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
   /** A custom route pointing at a feed that is not here: just deleted, or a link pasted. */
   const customMissing = requested === 'custom' && customFeeds.ready && activeFeed === undefined
 
+  // A people list's timeline: the reader's own list, private half included, or anybody's public one from a link.
+  const listParam = requested === 'list' ? listFromParam(searchParams.get('a')) : undefined
+  const ownLists = usePeopleLists({ reveal: listParam?.address })
+  const ownList = listParam === undefined ? undefined : ownLists.find(listParam.address)
+  const theirList = usePeopleListAt(
+    listParam !== undefined && ownLists.ready && ownList === undefined ? listParam.address : undefined,
+    listParam?.relays ?? [],
+  )
+  const shownList = ownList?.list ?? theirList.list
+  const listMembersRaw = ownList !== undefined ? entryMembers(ownList) : (theirList.list?.publicMembers ?? [])
+  const listMembersKey = listMembersRaw.join(',')
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the members themselves.
+  const listMembers = useMemo(() => listMembersRaw, [listMembersKey])
+  const listReady = ownLists.ready && (ownList !== undefined || theirList.ready)
+  const listMissing = requested === 'list' && (listParam === undefined || (listReady && shownList === undefined))
+
   const tab: FeedTabId = resolveTab({
     requested,
     signedIn,
     customMissing,
+    listMissing,
     // `follows.loading` counts as HAVING a list.
     hasFollows: follows.authors.length > 0 || follows.loading,
   })
@@ -230,27 +249,31 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
           hashtags: activeFeed?.hashtags ?? [],
           authors: activeFeed?.authors ?? [],
         }
+      case 'list':
+        // The custom-feed engine, with the list's people as its accounts.
+        return { kind: 'custom', hashtags: [], authors: listMembers }
     }
-  }, [tag, tab, stableAuthors, pubkey, trendingHours, trendingIds, activeFeed])
+  }, [tag, tab, stableAuthors, pubkey, trendingHours, trendingIds, activeFeed, listMembers])
 
   // Held back until the follow list lands, otherwise discover flashes in and is torn.
   const waitingOnFollows = needsFollows && follows.loading
   const followsEmpty = tab === 'follows' && follows.resolved && follows.authors.length === 0
   // Same reasoning for custom feeds: subscribing before storage has been read would.
   const waitingOnCustom = requested === 'custom' && !customFeeds.ready
+  const waitingOnList = requested === 'list' && !listReady
   /** The two tabs that are THIS READER'S timeline, where their own note belongs. */
   const ownNotesOf = tag === null && (tab === 'follows' || tab === 'latest') ? pubkey : undefined
 
   const feed = useFeed(
     source,
-    active && !waitingOnFollows && !followsEmpty && !waitingOnCustom,
+    active && !waitingOnFollows && !followsEmpty && !waitingOnCustom && !waitingOnList,
     ownNotesOf === undefined ? undefined : { ownNotesOf },
   )
 
   // Follows are exempt from every quality rule, deliberately: you decided to follow.
 
   // Custom feeds are exempt for the same reason.
-  const gated = tag !== null || (tab !== 'follows' && tab !== 'custom')
+  const gated = tag !== null || (tab !== 'follows' && tab !== 'custom' && tab !== 'list')
   // Neither of these is a preference any more.
 
   // Hiding profileless accounts was a toggle, defaulted on, and switching it off.
@@ -515,8 +538,9 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
 
   /** Put the URL back on a feed that exists. */
   useEffect(() => {
-    if (customMissing && tab !== 'custom') router.replace(hrefFor(tab))
-  }, [customMissing, router, tab])
+    if (tab === 'custom' || tab === 'list') return
+    if (customMissing || listMissing) router.replace(hrefFor(tab))
+  }, [customMissing, listMissing, router, tab])
 
   // Tell the nav there is something waiting, so Home can show a dot from any route.
   useEffect(() => {
@@ -626,7 +650,7 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
   const collapsedRows = useMemo(() => {
     /** Mirrors `gated` above, and must keep mirroring. */
     const surface: Surface =
-      tag === null && (tab === 'follows' || tab === 'custom') ? 'curated' : 'discovery'
+      tag === null && (tab === 'follows' || tab === 'custom' || tab === 'list') ? 'curated' : 'discovery'
     const map = new Map<string, string>()
     if (surface === 'curated' || showHidden) return map
 
@@ -678,6 +702,7 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
     feed.loading ||
     waitingOnFollows ||
     waitingOnCustom ||
+    waitingOnList ||
     gate.settling ||
     trending.loading ||
     trendingBodiesPending
@@ -702,11 +727,28 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
         </div>
       ) : null}
 
+      {tag === null && tab === 'list' ? (
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3 sm:px-5">
+          <h2 className="min-w-0 truncate text-lg font-semibold text-text">{shownList?.title ?? 'Untitled list'}</h2>
+          {ownList !== undefined && entryPrivacy(ownList) !== 'public' ? (
+            <span className="shrink-0 text-text-faint">
+              <LockGlyph />
+              <span className="sr-only">Private</span>
+            </span>
+          ) : null}
+          {ownList !== undefined && privateUnread(ownList) && listMembers.length === 0 ? null : (
+            <span className="ml-auto shrink-0 text-sm text-text-muted">
+              {listMembers.length === 1 ? '1 person' : `${listMembers.length} people`}
+            </span>
+          )}
+        </div>
+      ) : null}
+
       {/* ONE sticky block holding the tab strip and the "Show N notes" band. */}
       <div className="chrome-offset sticky top-16 z-30 sm:top-0">
         {/* Equal-width tabs with a short accent underline under the active one. */}
         {/* Opaque, with no backdrop-filter. */}
-        {tag === null ? (
+        {tag === null && tab !== 'list' ? (
           /* The tabs centre on the WHOLE column. */
           /* `chrome-tabs`: the strip slides away with the header instead of staying behind. */
           <div className="chrome-tabs relative border-b border-border bg-bg">
@@ -819,6 +861,14 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
               Edit the feed
             </button>{' '}
             to add more.
+          </p>
+        ) : tab === 'list' && rows.length === 0 && !busy ? (
+          <p className={`px-4 py-8 text-center ${SCALED_BODY} text-text-muted sm:px-5`}>
+            {listMembers.length > 0
+              ? 'Nothing yet from the people on this list.'
+              : ownList !== undefined && privateUnread(ownList)
+                ? 'The people on this list are private, and your signer did not open them.'
+                : 'Nobody is on this list yet.'}
           </p>
         ) : tab === 'trending' && rows.length === 0 && !busy ? (
           <p className={`px-4 py-10 text-center ${SCALED_BODY} text-text-muted sm:px-5`}>

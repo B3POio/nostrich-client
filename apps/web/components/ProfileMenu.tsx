@@ -9,9 +9,13 @@ import { npubOf } from '../lib/format'
 import { getPool } from '../lib/pool'
 import { useUserList } from '../lib/user-lists'
 import { useMenuClickAway } from '../lib/dismiss'
+import { entryMembers, entryPrivacy, listErrorText, usePeopleLists } from '../lib/people-lists'
+import { listHref } from '../lib/links'
 import type { ActionIconName } from '@nostrich/app'
 
 import { FeedEditor } from './FeedEditor'
+import { ListEditor } from './ListEditor'
+import { LockGlyph } from './icons'
 import { InteractionIcon } from './InteractionIcon'
 import { sessionPubkey, useSession } from './SessionProvider'
 
@@ -26,6 +30,7 @@ export function ProfileMenu({ pubkey }: { pubkey: Hex }): React.ReactNode {
   const muted = useUserList('muted')
   const mutedReposts = useUserList('mutedReposts')
   const customFeeds = useCustomFeeds()
+  const peopleLists = usePeopleLists()
   /** Keyed on an occurrence counter, not on the message text. */
   const [flash, setFlash] = useState<{ text: string; seq: number } | null>(null)
   const seq = useRef(0)
@@ -36,6 +41,7 @@ export function ProfileMenu({ pubkey }: { pubkey: Hex }): React.ReactNode {
   // The menu has two panes.
   const [picking, setPicking] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [creatingList, setCreatingList] = useState(false)
 
   useMenuClickAway(
     () => ref.current?.open === true,
@@ -85,6 +91,8 @@ export function ProfileMenu({ pubkey }: { pubkey: Hex }): React.ReactNode {
 
   const npub = npubOf(pubkey)
   const isSelf = viewer === pubkey
+  // With a key the picker holds the reader's lists first; without one, only this device's feeds.
+  const pickerLabel = peopleLists.canWrite ? 'Add to list' : 'Add to feed'
 
   return (
     <details ref={ref} className="relative">
@@ -113,9 +121,49 @@ export function ProfileMenu({ pubkey }: { pubkey: Hex }): React.ReactNode {
                 </span>
               </button>
               <span className="text-xs font-semibold uppercase tracking-wide text-text-faint">
-                Add to feed
+                {pickerLabel}
               </span>
             </div>
+            {/* The rows scroll inside the menu, so a long run of lists still reaches the last. */}
+            <div className="max-h-[min(60vh,420px)] overflow-y-auto">
+            {peopleLists.canWrite
+              ? peopleLists.entries.map(entry => {
+                  const member = entryMembers(entry).includes(pubkey)
+                  const name = entry.list.title ?? 'Untitled list'
+                  return (
+                    <Item
+                      key={entry.list.address}
+                      icon={member ? 'check' : 'add'}
+                      label={name}
+                      lock={entryPrivacy(entry) !== 'public'}
+                      onClick={() => {
+                        close()
+                        void peopleLists
+                          .run({ type: 'toggle', address: entry.list.address, pubkey, add: !member })
+                          .then(
+                            () => announce(member ? `Removed from ${name}` : `Added to ${name}`),
+                            failure => announce(listErrorText(failure)),
+                          )
+                      }}
+                    />
+                  )
+                })
+              : null}
+            {peopleLists.canWrite ? (
+              <Item
+                icon="playlist_add"
+                label="New list…"
+                onClick={() => {
+                  setCreatingList(true)
+                  close()
+                }}
+              />
+            ) : null}
+            {peopleLists.canWrite ? (
+              <p className="border-t border-border px-4 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-text-faint">
+                Feeds
+              </p>
+            ) : null}
             {customFeeds.feeds.map(item => {
               const member = item.authors.includes(pubkey)
               return (
@@ -147,6 +195,7 @@ export function ProfileMenu({ pubkey }: { pubkey: Hex }): React.ReactNode {
                 close()
               }}
             />
+            </div>
           </>
         ) : (
           <>
@@ -181,6 +230,7 @@ export function ProfileMenu({ pubkey }: { pubkey: Hex }): React.ReactNode {
                 />
               </>
             )}
+            <Item icon="playlist_add" label={pickerLabel} trailing="chevron_right" onClick={() => setPicking(true)} />
             <Item
               icon="link"
               label="Copy user link"
@@ -205,6 +255,15 @@ export function ProfileMenu({ pubkey }: { pubkey: Hex }): React.ReactNode {
         />
       ) : null}
 
+      {creatingList ? (
+        <ListEditor
+          api={peopleLists}
+          seedMembers={[pubkey]}
+          onClose={() => setCreatingList(false)}
+          onCreated={created => router.push(listHref(created.list))}
+        />
+      ) : null}
+
       {flash !== null ? (
         <span
           role="status"
@@ -224,6 +283,7 @@ function Item({
   onClick,
   danger = false,
   trailing,
+  lock = false,
 }: {
   /** A Material Symbols name, for concepts with no counterpart in the app's own icon set. */
   icon?: string
@@ -234,6 +294,8 @@ function Item({
   danger?: boolean
   /** Glyph at the right edge. A chevron marks the one item that opens a second pane. */
   trailing?: string
+  /** A private list's lock, beside its name. */
+  lock?: boolean
 }): React.ReactNode {
   return (
     <button
@@ -251,6 +313,12 @@ function Item({
         </span>
       )}
       <span className="min-w-0 flex-1 truncate">{label}</span>
+      {lock ? (
+        <span className="shrink-0 text-text-faint">
+          <LockGlyph />
+          <span className="sr-only">Private</span>
+        </span>
+      ) : null}
       {trailing !== undefined ? (
         <span
           className={`material-symbols-outlined text-[18px]! ${danger ? '' : 'text-text-faint'}`}

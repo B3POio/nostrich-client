@@ -231,3 +231,6 @@ export {
   editTarget,
   newestEdit,
 } from './edited'
+export * from './deletions'
+export * from './people-lists'
+export * from './private-tags'

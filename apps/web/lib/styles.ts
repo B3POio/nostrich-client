@@ -89,3 +89,7 @@ export const TAB_LABEL = 'relative flex h-5 items-center'
 export const TAB_UNDERLINE = 'absolute -bottom-3.5 left-0 right-0 h-1 rounded-lg bg-text'
 export const TAB_ACTIVE = 'font-bold text-text'
 export const TAB_IDLE = 'font-medium text-text-muted'
+
+/** The small black pill with a plus that starts something new. */
+export const ACTION_PILL =
+  'inline-flex shrink-0 items-center gap-[7px] rounded-full bg-text py-2 pl-[11px] pr-3.5 text-[13px] font-semibold text-bg transition-opacity hover:opacity-90 min-[461px]:py-[9px] min-[461px]:pl-[13px] min-[461px]:pr-[17px] min-[461px]:text-[14px]'

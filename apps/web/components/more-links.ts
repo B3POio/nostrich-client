@@ -1,5 +1,5 @@
 /** What lives behind More: places a reader visits on purpose, not mid-scroll. */
-import { ARTICLES_PATH, DOWNLOADS_PATH, SETTINGS_PATH } from './icons'
+import { ARTICLES_PATH, DOWNLOADS_PATH, LISTS_PATH, SETTINGS_PATH } from './icons'
 
 export interface MoreLink {
   href: string
@@ -18,6 +18,8 @@ export const SETTINGS_LINK: MoreLink = { href: '/settings', label: 'Settings', i
 /** Every row, in the order the rail and the drawer draw them. */
 export const MORE_LINKS: readonly MoreLink[] = [
   { href: '/articles', label: 'Articles', icon: 'article', svg: ARTICLES_PATH },
+  // The reader's own lists need a key to read.
+  { href: '/lists', label: 'Lists', icon: 'list', svg: LISTS_PATH, auth: true },
   { href: '/downloads', label: 'Downloads', icon: 'download', svg: DOWNLOADS_PATH },
   SETTINGS_LINK,
 ]

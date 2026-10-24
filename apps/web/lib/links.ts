@@ -1,4 +1,4 @@
-import { encodeNevent, encodeNote, type NostrEvent } from '@nostrich/nostr'
+import { PEOPLE_LIST_KINDS, decodePointer, encodeNaddr, encodeNevent, encodeNote, type Hex, type NostrEvent } from '@nostrich/nostr'
 
 /** Where a nostr: entity points. */
 const RESOLVER = 'https://njump.me'
@@ -77,4 +77,21 @@ export function linkKind(href: string): LinkKind {
   if (!EXTERNAL_SCHEMES.includes(parsed.protocol)) return { kind: 'refused' }
 
   return { kind: 'external', href: absolute, target: '_blank', rel: EXTERNAL_REL }
+}
+
+/** A people list's address out of the `a` a list's feed is opened with. */
+export function listFromParam(raw: string | null): { address: string; relays: string[] } | undefined {
+  if (raw === null || !/^naddr1/.test(raw)) return undefined
+  try {
+    const pointer = decodePointer(raw)
+    if (pointer.type !== 'naddr' || !PEOPLE_LIST_KINDS.includes(pointer.kind)) return undefined
+    return { address: `${pointer.kind}:${pointer.pubkey}:${pointer.identifier}`, relays: pointer.relays }
+  } catch {
+    return undefined
+  }
+}
+
+/** A people list opens as a feed on Home, the reader's own or anybody's they were linked to. */
+export function listHref(pointer: { kind: number; pubkey: Hex; identifier: string }): string {
+  return `/?feed=list&a=${encodeURIComponent(encodeNaddr(pointer))}`
 }
