@@ -84,6 +84,8 @@ export interface DirectMessageOptions {
   subject?: string
   /** Participant pubkey -> a relay where they can be reached, copied into the p-tags. */
   relayHints?: Readonly<Record<Hex, RelayUrl>>
+  /** More tags for the rumor, such as the `emoji` tags its shortcodes need. */
+  tags?: readonly (readonly string[])[]
 }
 
 /** Build the gift wraps for one message. */
@@ -110,6 +112,7 @@ export async function buildDirectMessage(
   if (replyToId !== undefined) tags.push(['e', replyToId, '', 'reply'])
   if (options.subject !== undefined) tags.push(['subject', options.subject])
   if (options.file !== undefined) tags.push(...fileTags(options.file))
+  for (const tag of options.tags ?? []) tags.push([...tag])
 
   const sentAt = Math.floor(Date.now() / 1000)
   const draft = {

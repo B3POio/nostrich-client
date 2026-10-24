@@ -411,8 +411,9 @@ export async function sendChatMessage(
   signer: Signer,
   participants: Hex[],
   content: string,
+  tags: readonly (readonly string[])[] = [],
 ): Promise<SendResult> {
-  const { message, wraps } = await buildDirectMessage(signer, participants, content)
+  const { message, wraps } = await buildDirectMessage(signer, participants, content, undefined, { tags })
   const lists = await fetchRelayLists(participants)
   const { deliveries, undeliverable: unrouted } = routeWraps(wraps, lists)
   /* The sender is one of the wraps and is not a participant to warn. */

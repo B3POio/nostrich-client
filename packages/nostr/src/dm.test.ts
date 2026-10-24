@@ -133,6 +133,18 @@ describe('buildDirectMessage / unwrapDirectMessage', () => {
     expect(received?.wrapId).toBe(wrap.id)
   })
 
+  it('carries the emoji tags a custom shortcode needs inside the rumor', async () => {
+    const alice = identity()
+    const bob = identity()
+    const tag = ['emoji', 'wave', 'https://cdn.example.com/wave.png']
+
+    const built = await buildDirectMessage(alice.signer, [bob.pubkey], 'hi :wave:', undefined, { tags: [tag] })
+    const seal = openLayer(wrapFor(built.wraps, bob.pubkey), bob.secret) as { pubkey: string; content: string }
+    const inner = openLayer(seal, bob.secret) as { tags: string[][] }
+    expect(inner.tags).toContainEqual(tag)
+    expect(inner.tags).toContainEqual(['p', bob.pubkey])
+  })
+
   it('lets the sender read their own copy on a new device', async () => {
     const alice = identity()
     const bob = identity()

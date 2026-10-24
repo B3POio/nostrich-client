@@ -4,6 +4,7 @@ import { Link } from './AppLink'
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   buildShortNote,
+  emojiTagsFor,
   encodeNevent,
   profileDisplayName,
   referencesFromContent,
@@ -23,6 +24,9 @@ import { useUploads } from '../lib/upload'
 import { LINK } from '../lib/styles'
 import { Avatar } from './Avatar'
 import { EmojiPicker } from './EmojiPicker'
+import { EmojiSuggest } from './EmojiSuggest'
+import { useEmojiField } from '../lib/emoji-field'
+import { useEmojiIndex } from '../lib/emoji-packs'
 import { useMentionField } from '../lib/mentions'
 import { MENTION_PANEL_WIDTH, MentionPicker } from './MentionPicker'
 import { useCaretAnchor } from '../lib/caret-anchor'
@@ -227,6 +231,9 @@ export function Composer({
   /** The `@handle` under the caret, if any. */
   // Shared with the reply composer: one implementation, so the two cannot drift.
   const mentions = useMentionField(initialMentions)
+  /** The `:shortcode` under the caret, and the reader's emoji to finish it with. */
+  const emojis = useEmojiField()
+  const emojiIndex = useEmojiIndex()
   /* Re-measured whenever the `@` moves or the text around it changes. */
   const caretAt = useCaretAnchor(
     mirrorRef.current,
@@ -355,6 +362,8 @@ export function Composer({
         if (author !== undefined) addPerson(author)
       }
       for (const tag of references.hashtags) tags.push(['t', tag])
+      // Without its tag a `:shortcode:` is the literal colons on every other client.
+      tags.push(...emojiTagsFor(body, emojiIndex))
 
       signed = await signer.signEvent(buildShortNote(body, { tags }))
     } catch (cause) {
@@ -437,11 +446,21 @@ export function Composer({
             onChange={event => {
               setBody(event.target.value)
               mentions.sync(event.currentTarget)
+              emojis.sync(event.currentTarget)
             }}
-            onKeyUp={event => mentions.sync(event.currentTarget)}
+            onKeyUp={event => {
+              mentions.sync(event.currentTarget)
+              emojis.sync(event.currentTarget)
+            }}
             onScroll={event => syncMirror(event.currentTarget)}
-            onClick={event => mentions.sync(event.currentTarget)}
-            onBlur={() => mentions.dismiss()}
+            onClick={event => {
+              mentions.sync(event.currentTarget)
+              emojis.sync(event.currentTarget)
+            }}
+            onBlur={() => {
+              mentions.dismiss()
+              emojis.dismiss()
+            }}
             onKeyDown={event => {
               if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
                 event.preventDefault()
@@ -547,6 +566,13 @@ export function Composer({
                 onDismiss={mentions.dismiss}
                 onActive={mentions.announce}
               />
+            ) : emojis.query !== undefined ? (
+              <EmojiSuggest
+                query={emojis.query}
+                field={textareaRef.current}
+                onPick={emoji => emojis.apply(textareaRef.current, content, emoji, setBody)}
+                onDismiss={emojis.dismiss}
+              />
             ) : null}
           </div>
 
@@ -584,7 +610,11 @@ export function Composer({
                 />
               </span>
               {emojiOpen ? (
-                <EmojiPicker onPick={emoji => insert(emoji)} onClose={() => setEmojiOpen(false)} />
+                <EmojiPicker
+                  onPick={emoji => insert(emoji)}
+                  onPickCustom={emoji => emojis.insert(textareaRef.current, content, emoji, setBody)}
+                  onClose={() => setEmojiOpen(false)}
+                />
               ) : null}
             </div>
 

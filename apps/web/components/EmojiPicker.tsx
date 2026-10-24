@@ -1,7 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import type { CustomEmoji } from '@nostrich/nostr'
+
 import { useMenuClickAway } from '../lib/dismiss'
+import { useEmojiSet } from '../lib/emoji-packs'
+import { EmojiThumb } from './EmojiThumb'
 
 /** A small emoji picker, hand-rolled rather than pulled from a package. */
 
@@ -38,13 +42,31 @@ const GROUPS: { name: string; emoji: string[] }[] = [
   },
 ]
 
+/** The reader's custom emoji, a section per pack. */
+function packSections(
+  emoji: readonly CustomEmoji[],
+  titleOf: (address: string) => string | undefined,
+): { key: string; title: string; emoji: CustomEmoji[] }[] {
+  const sections = new Map<string, { key: string; title: string; emoji: CustomEmoji[] }>()
+  for (const item of emoji) {
+    const key = item.pack ?? 'mine'
+    const held = sections.get(key)
+    if (held !== undefined) held.emoji.push(item)
+    else sections.set(key, { key, title: (item.pack === undefined ? undefined : titleOf(item.pack)) ?? 'Your emoji', emoji: [item] })
+  }
+  return [...sections.values()]
+}
+
 export function EmojiPicker({
   onPick,
+  onPickCustom,
   onClose,
   above = false,
   align = 'left',
 }: {
   onPick: (emoji: string) => void
+  /** A custom emoji from the reader's packs; without it the Yours tab is not drawn. */
+  onPickCustom?: (emoji: CustomEmoji) => void
   onClose: () => void
   /** Opens upward instead of down. */
   above?: boolean
@@ -70,7 +92,14 @@ export function EmojiPicker({
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const active = GROUPS[group] ?? GROUPS[0]
+  const set = useEmojiSet()
+  const sections = useMemo(
+    () => (onPickCustom === undefined ? [] : packSections(set.emoji, address => set.shown.get(address)?.title)),
+    [onPickCustom, set.emoji, set.shown],
+  )
+  const tabs = sections.length > 0 ? ['Yours', ...GROUPS.map(item => item.name)] : GROUPS.map(item => item.name)
+  const yours = sections.length > 0 && group === 0
+  const active = GROUPS[sections.length > 0 ? group - 1 : group] ?? GROUPS[0]
 
   return (
     <div
@@ -84,33 +113,56 @@ export function EmojiPicker({
       } ${align === 'right' ? 'sm:right-0' : 'sm:left-0'} sm:w-[min(360px,calc(100vw-2rem))]`}
     >
       <div className="no-scrollbar flex overflow-x-auto border-b border-border">
-        {GROUPS.map((item, index) => (
+        {tabs.map((name, index) => (
           <button
-            key={item.name}
+            key={name}
             type="button"
             onClick={() => setGroup(index)}
-            // px-2 and flex-1: five group names at px-3 measured wider than the panel.
-            className={`flex-1 shrink-0 px-2 py-2 text-xs font-semibold transition-colors ${
+            // Never broken mid-word: with the Yours tab the strip scrolls instead.
+            className={`flex-auto shrink-0 whitespace-nowrap px-2 py-2 text-xs font-semibold transition-colors ${
               index === group ? 'text-text' : 'text-text-faint hover:text-text-muted'
             }`}
           >
-            {item.name}
+            {name}
           </button>
         ))}
       </div>
-      <div className="grid max-h-56 grid-cols-8 gap-0.5 overflow-y-auto p-2">
-        {active?.emoji.map(emoji => (
-          <button
-            key={emoji}
-            type="button"
-            onClick={() => onPick(emoji)}
-            aria-label={emoji}
-            className="flex size-8 items-center justify-center rounded-lg text-[20px] leading-none transition-colors hover:bg-bg-inset"
-          >
-            {emoji}
-          </button>
-        ))}
-      </div>
+      {yours ? (
+        <div className="max-h-56 overflow-y-auto p-2">
+          {sections.map(section => (
+            <section key={section.key} className="mb-2 last:mb-0">
+              <h3 className="truncate px-1 pb-1 text-[11px] font-semibold text-text-faint">{section.title}</h3>
+              <div className="grid grid-cols-8 gap-0.5">
+                {section.emoji.map(item => (
+                  <button
+                    key={`${section.key}/${item.shortcode}`}
+                    type="button"
+                    onClick={() => onPickCustom?.(item)}
+                    aria-label={`:${item.shortcode}:`}
+                    className="flex size-8 items-center justify-center rounded-lg transition-colors hover:bg-bg-inset"
+                  >
+                    <EmojiThumb emoji={item} size="size-6" />
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div className="grid max-h-56 grid-cols-8 gap-0.5 overflow-y-auto p-2">
+          {active?.emoji.map(emoji => (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => onPick(emoji)}
+              aria-label={emoji}
+              className="flex size-8 items-center justify-center rounded-lg text-[20px] leading-none transition-colors hover:bg-bg-inset"
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

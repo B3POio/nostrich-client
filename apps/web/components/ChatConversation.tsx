@@ -5,6 +5,7 @@ import { Link } from './AppLink'
 import {
   type ContentSegment,
   parseContent,
+  emojiTagsFor,
   isFileMessage,
   profileDisplayName,
   type Conversation,
@@ -27,6 +28,7 @@ import { useNowSeconds } from './Clock'
 import { DraftMedia } from './DraftMedia'
 import { splitMessage } from '../lib/media-text'
 import { useAutoGrow } from '../lib/autogrow'
+import { useEmojiIndex } from '../lib/emoji-packs'
 
 /** One conversation: header, transcript, composer. */
 
@@ -57,6 +59,7 @@ export function ChatConversation({
   const now = useNowSeconds()
 
   const [draft, setDraft] = useState('')
+  const emojiIndex = useEmojiIndex()
   const photoRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
   /** Photos go to Blossom and the MESSAGE carries the URL. */
@@ -116,7 +119,7 @@ export function ChatConversation({
     setError(undefined)
     try {
       const recipients = conversation.participants.filter(pubkey => pubkey !== self)
-      const result = await sendChatMessage(signer, recipients, content)
+      const result = await sendChatMessage(signer, recipients, content, emojiTagsFor(content, emojiIndex))
       if (!result.ok) {
         setError('No relay accepted that message.')
         return

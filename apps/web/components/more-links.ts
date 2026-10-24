@@ -1,5 +1,5 @@
 /** What lives behind More: places a reader visits on purpose, not mid-scroll. */
-import { ARTICLES_PATH, DOWNLOADS_PATH, LISTS_PATH, SETTINGS_PATH } from './icons'
+import { ARTICLES_PATH, DOWNLOADS_PATH, EMOJI_PACKS_PATH, LISTS_PATH, SETTINGS_PATH } from './icons'
 
 export interface MoreLink {
   href: string
@@ -20,6 +20,8 @@ export const MORE_LINKS: readonly MoreLink[] = [
   { href: '/articles', label: 'Articles', icon: 'article', svg: ARTICLES_PATH },
   // The reader's own lists need a key to read.
   { href: '/lists', label: 'Lists', icon: 'list', svg: LISTS_PATH, auth: true },
+  // Adding a pack writes the reader's own list.
+  { href: '/emoji', label: 'Emoji Packs', icon: 'add_reaction', svg: EMOJI_PACKS_PATH, auth: true },
   { href: '/downloads', label: 'Downloads', icon: 'download', svg: DOWNLOADS_PATH },
   SETTINGS_LINK,
 ]

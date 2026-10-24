@@ -5,8 +5,8 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 describe('the More menu', () => {
-  it('holds Articles, Lists, Downloads and Settings, in that order, with Settings last', () => {
-    expect(moreLinks().map(link => link.href)).toEqual(['/articles', '/lists', '/downloads', '/settings'])
+  it('holds Articles, Lists, Emoji Packs, Downloads and Settings, in that order, with Settings last', () => {
+    expect(moreLinks().map(link => link.href)).toEqual(['/articles', '/lists', '/emoji', '/downloads', '/settings'])
   })
 
   it('leaves Settings out where the drawer draws it as a row of its own', () => {

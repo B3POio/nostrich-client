@@ -13,7 +13,7 @@ Your keys are your account. Your notes live on relays anyone can run.
 [![License: MIT](https://img.shields.io/badge/License-MIT-000000.svg?style=flat-square)](LICENSE)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-2%2C471-2ea043?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-2%2C618-2ea043?style=flat-square)](#testing)
 
 </div>
 
@@ -50,6 +50,7 @@ so every reader is not ranking the network in their own browser.
 - Link previews and media galleries
 - Inline video and audio players
 - Custom emoji rendering (NIP-30)
+- People lists, public or private (NIP-51)
 - Content warnings honoured (NIP-36)
 
 </td>
@@ -61,7 +62,7 @@ so every reader is not ranking the network in their own browser.
 - Image and video upload to Blossom
 - Drafts that survive a reload
 - Mentions with live search
-- Emoji picker
+- Emoji picker with your custom emoji packs
 - Bookmarks, public or encrypted
 - Deletion requests (NIP-09)
 
@@ -250,7 +251,7 @@ pnpm typecheck     # strict, with noUncheckedIndexedAccess
 pnpm test          # every package
 ```
 
-2,471 tests across 195 files. The protocol core is tested against real event fixtures
+2,618 tests across 211 files. The protocol core is tested against real event fixtures
 rather than hand-made ones, because a fixture you wrote yourself only proves
 the parser agrees with itself.
 

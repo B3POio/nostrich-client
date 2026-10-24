@@ -4,7 +4,7 @@ import { naddrEncode, decode, neventEncode, noteEncode, nprofileEncode, npubEnco
 
 import { normalizeHex, parseAddress } from './events'
 import { repairMediaUrl } from './moved-hosts'
-import { tryNormalizeRelayUrl } from './relays'
+import { isPrivateUrl, tryNormalizeRelayUrl } from './relays'
 import type { ContentSegment, Hex, RelayUrl } from './types'
 
 const BECH32 = '[qpzry9x8gf2tvdw0s3jn54khce6mua7l]'
@@ -20,8 +20,8 @@ const TOKEN = new RegExp(
     `(?:nostr:)?(?:nprofile|npub|nevent|note|naddr)1${BECH32}{6,}`,
     // Legacy NIP-27 positional reference into the event's own tags.
     '#\\[\\d+\\]',
-    /** A NIP-30 shortcode. */
-    ':[A-Za-z0-9_]+:',
+    /** A NIP-30 shortcode, hyphens included, kept only when the event declares it. */
+    ':[A-Za-z0-9_-]+:',
     // Greedy to whitespace on purpose: "example.com/page#section" is one url, not a url.
     'https?:\\/\\/[^\\s<>"\'`]+',
     `(?:lightning:)?ln(?:bc|tb|bcrt)[0-9]*[munp]?1${BECH32}{20,}`,
@@ -73,6 +73,8 @@ function emojiUrl(shortcode: string, tags: readonly (readonly string[])[]): stri
     const url = tag[2]
     if (url === undefined) continue
     if (!/^https?:\/\//i.test(url)) continue
+    // Never a private address: the browser fetches it the moment the note is drawn.
+    if (isPrivateUrl(url)) continue
     return url
   }
   return undefined

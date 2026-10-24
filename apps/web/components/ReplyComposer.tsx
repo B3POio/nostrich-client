@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   buildComment,
   buildReply,
+  emojiTagsFor,
   isComment,
   profileDisplayName,
   type NostrEvent,
@@ -18,6 +19,9 @@ import { useProfile } from '../lib/profiles'
 import { useMentionField } from '../lib/mentions'
 import { Avatar } from './Avatar'
 import { EmojiPicker } from './EmojiPicker'
+import { EmojiSuggest } from './EmojiSuggest'
+import { useEmojiField } from '../lib/emoji-field'
+import { useEmojiIndex } from '../lib/emoji-packs'
 import { DraftMedia } from './DraftMedia'
 import { AttachmentPreview } from './AttachmentPreview'
 import { REPLY_PREVIEW_MAX_HEIGHT } from '../lib/preview-fit'
@@ -72,6 +76,8 @@ export function ReplyComposer({ parent }: { parent: NostrEvent }): React.ReactNo
   }, [text, syncMirror])
   // Same mention behaviour as the main composer: a reply is a post, and a reader.
   const mentions = useMentionField()
+  const emojis = useEmojiField()
+  const emojiIndex = useEmojiIndex()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -138,7 +144,7 @@ export function ReplyComposer({ parent }: { parent: NostrEvent }): React.ReactNo
         : buildReply(written, parent)
       const signed = await signer.signEvent({
         ...reply,
-        tags: [...reply.tags, ...uploads.imetaTags],
+        tags: [...reply.tags, ...uploads.imetaTags, ...emojiTagsFor(written, emojiIndex)],
       })
       /** THE REPLY APPEARS NOW. */
       const draft = { text }
@@ -208,11 +214,21 @@ export function ReplyComposer({ parent }: { parent: NostrEvent }): React.ReactNo
             onChange={e => {
               setText(e.target.value)
               mentions.sync(e.currentTarget)
+              emojis.sync(e.currentTarget)
             }}
-            onKeyUp={e => mentions.sync(e.currentTarget)}
+            onKeyUp={e => {
+              mentions.sync(e.currentTarget)
+              emojis.sync(e.currentTarget)
+            }}
             onScroll={e => syncMirror(e.currentTarget)}
-            onClick={e => mentions.sync(e.currentTarget)}
-            onBlur={() => mentions.dismiss()}
+            onClick={e => {
+              mentions.sync(e.currentTarget)
+              emojis.sync(e.currentTarget)
+            }}
+            onBlur={() => {
+              mentions.dismiss()
+              emojis.dismiss()
+            }}
             onFocus={() => {
               if (!signedIn) router.push('/login')
             }}
@@ -242,6 +258,13 @@ export function ReplyComposer({ parent }: { parent: NostrEvent }): React.ReactNo
               }
               onDismiss={mentions.dismiss}
               onActive={mentions.announce}
+            />
+          ) : emojis.query !== undefined ? (
+            <EmojiSuggest
+              query={emojis.query}
+              field={textareaRef.current}
+              onPick={emoji => emojis.apply(textareaRef.current, text, emoji, setText)}
+              onDismiss={emojis.dismiss}
             />
           ) : null}
           {/* AN UPLOAD NEEDS DRAWING TOO, and this is where it was missing. */}
@@ -343,6 +366,7 @@ export function ReplyComposer({ parent }: { parent: NostrEvent }): React.ReactNo
                     setText(current => current + emoji)
                     textareaRef.current?.focus()
                   }}
+                  onPickCustom={emoji => emojis.insert(textareaRef.current, text, emoji, setText)}
                   onClose={() => setEmojiOpen(false)}
                 />
               ) : null}

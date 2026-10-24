@@ -234,3 +234,4 @@ export {
 export * from './deletions'
 export * from './people-lists'
 export * from './private-tags'
+export * from './emoji-packs'
