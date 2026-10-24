@@ -2,11 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Hex } from '@nostrich/nostr'
 
 import { closesDrawer } from '../lib/swipe-close'
-import { AccountBlock, NAV_ITEMS, navHref } from './LeftRail'
+import { NavGlyph } from './icons'
+import { AccountBlock, NAV_ITEMS, navHref, type NavItem } from './LeftRail'
+import { SETTINGS_LINK, inMoreSection, moreHref, moreLinks } from './more-links'
 
 /** The phone's main menu, as a drawer. */
 export function MobileDrawer({
@@ -23,6 +25,11 @@ export function MobileDrawer({
 }): React.ReactNode {
   const hideAboveSm = anyWidth ? '' : 'sm:hidden'
   const pathname = usePathname()
+  // More opens in place, and starts closed every time the drawer opens.
+  const [moreOpen, setMoreOpen] = useState(false)
+  useEffect(() => {
+    if (!open) setMoreOpen(false)
+  }, [open])
 
   /** Escape closes it, and the page behind does not scroll while it is open. */
   /** A switched account closes the menu. */
@@ -116,7 +123,8 @@ export function MobileDrawer({
         {/* The menu scrolls. */}
         <nav aria-label="All sections" className="min-h-0 flex-1 overflow-y-auto py-2">
           <ul>
-            {NAV_ITEMS.map(item => {
+            {/* Settings is a row of its own right below Profile here, and out of More. */}
+            {([...NAV_ITEMS, SETTINGS_LINK] as NavItem[]).map(item => {
               const active =
                 item.href === '/'
                   ? pathname === '/'
@@ -140,18 +148,7 @@ export function MobileDrawer({
                           {item.icon}
                         </span>
                       ) : (
-                        <svg
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                          className="size-[24px]"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2.2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d={item.svg} />
-                        </svg>
+                        <NavGlyph path={item.svg} filled={item.filled} className="size-[24px]" />
                       )}
                     </span>
                     {item.label}
@@ -161,6 +158,71 @@ export function MobileDrawer({
             })}
           </ul>
 
+          {/* The rail's More rows, opened in place under the row that names them. */}
+          <ul>
+            <li>
+              <button
+                type="button"
+                aria-expanded={moreOpen}
+                aria-controls="drawer-more"
+                onClick={() => setMoreOpen(value => !value)}
+                className={`flex w-full items-center gap-4 px-4 py-3 text-left text-lg transition-colors hover:bg-bg-inset ${
+                  inMoreSection(pathname, true) ? 'font-bold text-text' : 'font-normal text-text-muted'
+                }`}
+              >
+                <span className="flex shrink-0 items-center text-nav-icon">
+                  <span className="material-symbols-outlined text-[26px]!" aria-hidden="true">
+                    pending
+                  </span>
+                </span>
+                More
+                <span
+                  className={`material-symbols-outlined ml-auto text-[22px]! transition-transform duration-200 ${
+                    moreOpen ? 'rotate-180' : ''
+                  }`}
+                  aria-hidden="true"
+                >
+                  expand_more
+                </span>
+              </button>
+            </li>
+          </ul>
+
+          {/* A grid track from 0fr to 1fr animates to a height nobody measured. */}
+          <div
+            className={`grid transition-[grid-template-rows] duration-200 ease-out ${
+              moreOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+            }`}
+          >
+            <ul id="drawer-more" inert={!moreOpen} className="overflow-hidden">
+              {moreLinks(true).map(link => {
+                const active = pathname.startsWith(link.href)
+                return (
+                  <li key={link.href}>
+                    <Link
+                      href={moreHref(link, pubkey !== undefined)}
+                      onClick={onClose}
+                      aria-current={active ? 'page' : undefined}
+                      className={`flex items-center gap-4 px-4 py-3 text-lg transition-colors hover:bg-bg-inset ${
+                        active ? 'font-bold text-text' : 'font-normal text-text-muted'
+                      }`}
+                    >
+                      <span className="flex shrink-0 items-center text-nav-icon">
+                        {link.svg === undefined ? (
+                          <span className="material-symbols-outlined text-[26px]!" aria-hidden="true">
+                            {link.icon}
+                          </span>
+                        ) : (
+                          <NavGlyph path={link.svg} className="size-[24px]" />
+                        )}
+                      </span>
+                      {link.label}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          </div>
         </nav>
 
         {/* The account switcher, at the bottom. */}

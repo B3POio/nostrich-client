@@ -17,7 +17,8 @@ import { asset } from '../lib/assets'
 const SWITCH_DEADLINE_MS = 1_500
 import { PATHS } from '@nostrich/app'
 
-import { CHAT_BUBBLE_PATH, PROFILE_PATH } from './icons'
+import { CHAT_BUBBLE_PATH, EXPLORE_PATH, HOME_PATH, NOTIFICATIONS_PATH, NavGlyph, PROFILE_PATH } from './icons'
+import { inMoreSection, moreHref, moreLinks } from './more-links'
 import { displayKey, npubOf } from '../lib/format'
 import { readAccountProfile } from '../lib/account-profiles'
 import { useNip05Verified, useProfile } from '../lib/profiles'
@@ -28,6 +29,7 @@ import { useNotificationsUnread, useZapsUnread } from '../lib/notifications'
 import { useUnreadChatWraps } from '../lib/chat-alerts'
 import { useInboxSplit } from '../lib/chat-inbox'
 import { useChat } from '../lib/chat'
+import { useMenuClickAway } from '../lib/dismiss'
 import { Avatar } from './Avatar'
 import { VerifiedBadge } from './VerifiedBadge'
 import { MAX_ACCOUNTS, sessionPubkey, useSession } from './SessionProvider'
@@ -40,32 +42,30 @@ import {
 
 /** The navigation rail: an icon strip that grows labels where there is room for them. */
 
-interface NavItem {
+export interface NavItem {
   href: string
   label: string
   /** Material Symbols ligature name. */
   icon: string
-  /** Inline SVG path, for the one glyph the icon font gets wrong. */
+  /** The app's own drawing, which wins over `icon`. */
   svg?: string
+  /** `svg` is a filled drawing on the 256 grid rather than a stroked one. */
+  filled?: boolean
   /** Needs a signer. */
   auth?: boolean
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { href: '/', label: 'Home', icon: 'home' },
-  { href: '/explore', label: 'Explore', icon: 'search', svg: 'M10.5 17.5a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM21 21l-5.5-5.5' },
-  { href: '/notifications', label: 'Notifications', icon: 'notifications', auth: true },
+  { href: '/', label: 'Home', icon: 'home', svg: HOME_PATH },
+  { href: '/explore', label: 'Explore', icon: 'search', svg: EXPLORE_PATH },
+  { href: '/notifications', label: 'Notifications', icon: 'notifications', svg: NOTIFICATIONS_PATH, auth: true },
   // "Chat", not "Messages" or "DMs".
-  { href: '/chat', label: 'Chat', icon: 'chat_bubble', svg: CHAT_BUBBLE_PATH, auth: true },
-  // `svg` wins over `icon`, as with Explore and Chat: the zap bolt has to be the same.
-  /* "Wallet", not "Zaps". */
+  { href: '/chat', label: 'Chat', icon: 'chat_bubble', svg: CHAT_BUBBLE_PATH, filled: true, auth: true },
+  // "Wallet", not "Zaps", drawn with the zap button's own bolt.
   { href: '/zaps', label: 'Wallet', icon: 'bolt', svg: PATHS.zap, auth: true },
-  { href: '/articles', label: 'Articles', icon: 'article' },
   { href: '/history', label: 'History', icon: 'history', auth: true },
   // `/profile` is a stand-in, not a route: the real href needs the signed-in npub.
   { href: '/profile', label: 'Profile', icon: 'person', svg: PROFILE_PATH, auth: true },
-  // Settings LAST: it is the one row every client has and every reader already knows.
-  { href: '/settings', label: 'Settings', icon: 'settings' },
 ]
 
 /** One row geometry for every item in the rail. */
@@ -158,21 +158,7 @@ export function LeftRail({ onCompose }: { onCompose: () => void }): React.ReactN
                           {item.icon}
                         </span>
                       ) : (
-                        <svg
-                          viewBox="0 0 24 24"
-                          aria-hidden="true"
-                          className="size-[28px]"
-                          fill="none"
-                          stroke="currentColor"
-                          // Constant, like every glyph beside.
-
-                          // 2.25, matched by arithmetic rather than by eye.
-                          strokeWidth={2.25}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d={item.svg} />
-                        </svg>
+                        <NavGlyph path={item.svg} filled={item.filled} className="size-[28px]" weight={2.25} />
                       )}
                       {/* Offset clear of the glyph. */}
                       {dotFor(item.href, unread, notificationsUnread, chatUnread, zapsUnread) ? (
@@ -194,6 +180,7 @@ export function LeftRail({ onCompose }: { onCompose: () => void }): React.ReactN
                 </li>
               )
             })}
+            <MoreMenu pubkey={pubkey} />
           </ul>
         </nav>
 
@@ -207,7 +194,7 @@ export function LeftRail({ onCompose }: { onCompose: () => void }): React.ReactN
                 aria-label="Write an article"
                 className={`${PILL} size-12 min-[1265px]:size-auto min-[1265px]:w-[240px] min-[1265px]:px-3 min-[1265px]:py-3`}
               >
-                <span className="material-symbols-outlined text-2xl! min-[1265px]:hidden" aria-hidden="true">
+                <span className="material-symbols-outlined text-2xl! min-[1265px]:hidden!" aria-hidden="true">
                   edit_square
                 </span>
                 <span className="hidden text-xl font-bold min-[1265px]:inline">Write</span>
@@ -219,7 +206,7 @@ export function LeftRail({ onCompose }: { onCompose: () => void }): React.ReactN
                 onClick={onCompose}
                 className={`${PILL} size-12 min-[1265px]:size-auto min-[1265px]:w-[240px] min-[1265px]:px-3 min-[1265px]:py-3`}
               >
-                <span className="material-symbols-outlined text-2xl! min-[1265px]:hidden" aria-hidden="true">
+                <span className="material-symbols-outlined text-2xl! min-[1265px]:hidden!" aria-hidden="true">
                   edit_square
                 </span>
                 <span className="hidden text-xl font-bold min-[1265px]:inline">Post</span>
@@ -228,7 +215,7 @@ export function LeftRail({ onCompose }: { onCompose: () => void }): React.ReactN
             )
           ) : (
             <Link href="/login" className={`${PILL_DARK} size-12 min-[1265px]:size-auto min-[1265px]:w-[240px] min-[1265px]:px-3 min-[1265px]:py-3`}>
-              <span className="material-symbols-outlined text-2xl! min-[1265px]:hidden" aria-hidden="true">
+              <span className="material-symbols-outlined text-2xl! min-[1265px]:hidden!" aria-hidden="true">
                 login
               </span>
               <span className="hidden text-xl font-bold min-[1265px]:inline">Sign In</span>
@@ -245,6 +232,115 @@ export function LeftRail({ onCompose }: { onCompose: () => void }): React.ReactN
         </div>
       ) : null}
     </div>
+  )
+}
+
+/** More: an upward popover of the rows that live behind it, portalled so its shadow is not clipped. */
+function MoreMenu({ pubkey }: { pubkey: Hex | undefined }): React.ReactNode {
+  const pathname = usePathname()
+  const ref = useRef<HTMLDetailsElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [open, setOpen] = useState(false)
+  const [box, setBox] = useState<{ left: number; bottom: number } | null>(null)
+  const active = inMoreSection(pathname)
+
+  const close = (): void => {
+    if (ref.current !== null) ref.current.open = false
+    setOpen(false)
+  }
+
+  // Measured from the row, so the panel's rows land on the rail's own alignment.
+  const place = (): void => {
+    const row = ref.current?.querySelector('summary')
+    if (row == null) return
+    const rect = row.getBoundingClientRect()
+    setBox({ left: rect.left - 1, bottom: window.innerHeight - rect.top + 8 })
+  }
+
+  useMenuClickAway(() => ref.current?.open === true, [ref, panelRef], close)
+
+  useEffect(() => {
+    if (!open) return
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') close()
+    }
+    // A scroll detaches the panel from its row, so it closes.
+    const onScroll = (): void => close()
+    window.addEventListener('resize', place)
+    window.addEventListener('scroll', onScroll, { passive: true, capture: true })
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('resize', place)
+      window.removeEventListener('scroll', onScroll, { capture: true })
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  return (
+    <li className="flex w-full justify-center min-[1265px]:justify-start">
+      <div className="min-[1265px]:w-full">
+        <details
+          ref={ref}
+          onToggle={event => {
+            const next = event.currentTarget.open
+            if (next) place()
+            setOpen(next)
+          }}
+        >
+          <summary
+            aria-label="More"
+            className={`${ROW} cursor-pointer list-none gap-4 text-xl hover:bg-hover [&::-webkit-details-marker]:hidden ${
+              active ? 'font-bold text-text' : 'font-normal text-text-muted'
+            }`}
+          >
+            {/* Three dots in a circle, at the weight of every other glyph in the rail. */}
+            <span className="relative flex shrink-0 items-center text-nav-icon">
+              <span className="material-symbols-outlined text-[30px]!" aria-hidden="true">
+                pending
+              </span>
+            </span>
+            <span className="hidden leading-none min-[1265px]:inline">More</span>
+          </summary>
+        </details>
+
+        {open && box !== null && typeof document !== 'undefined'
+          ? createPortal(
+              <div
+                ref={panelRef}
+                style={{ left: box.left, bottom: box.bottom }}
+                className="panel-shadow fixed z-[90] w-[260px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-border bg-bg py-1.5 dark:bg-bg-elevated"
+              >
+                {moreLinks().map(link => {
+                  const current = pathname === link.href || pathname.startsWith(`${link.href}/`)
+                  return (
+                    <Link
+                      key={link.href}
+                      href={moreHref(link, pubkey !== undefined)}
+                      onClick={close}
+                      aria-current={current ? 'page' : undefined}
+                      className={`${ROW} w-full gap-4 text-xl hover:bg-hover ${
+                        current ? 'font-bold text-text' : 'font-normal text-text-muted'
+                      }`}
+                    >
+                      <span className="relative flex shrink-0 items-center text-nav-icon">
+                        {link.svg === undefined ? (
+                          <span className="material-symbols-outlined text-[30px]!" aria-hidden="true">
+                            {link.icon}
+                          </span>
+                        ) : (
+                          <NavGlyph path={link.svg} className="size-[28px]" weight={2.25} />
+                        )}
+                      </span>
+                      <span className="leading-none">{link.label}</span>
+                    </Link>
+                  )
+                })}
+              </div>,
+              document.body,
+            )
+          : null}
+      </div>
+    </li>
   )
 }
 
@@ -294,14 +390,13 @@ export function AccountBlock({
     if (deadline.current !== undefined) clearTimeout(deadline.current)
   }, [])
 
-  useEffect(() => {
-    const onClick = (event: MouseEvent): void => {
-      const node = ref.current
-      if (node !== null && node.open && !node.contains(event.target as Node)) node.open = false
-    }
-    document.addEventListener('click', onClick)
-    return () => document.removeEventListener('click', onClick)
-  }, [])
+  useMenuClickAway(
+    () => ref.current?.open === true,
+    [ref],
+    () => {
+      if (ref.current !== null) ref.current.open = false
+    },
+  )
 
   const close = (): void => {
     if (ref.current !== null) ref.current.open = false

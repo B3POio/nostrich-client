@@ -44,6 +44,7 @@ import { RightRail } from "./RightRail";
 import { ComposeModal } from "./ComposeModal";
 import { FxCanvas } from "./FxCanvas";
 import { sessionPubkey, useSession } from "./SessionProvider";
+import { NavGlyph } from "./icons";
 
 /** The app frame: navigation, the reading column, and the sidebar beside. */
 /** Routes that give up the right rail and take the full width. */
@@ -296,20 +297,8 @@ function BottomBar({ onCompose }: { onCompose: () => void }): React.ReactNode {
                     {item.icon}
                   </span>
                 ) : (
-                  <svg
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                    // Tracks the font size beside it: 2px under, the offset that makes a box-filling SVG.
-                    className="size-[29px]"
-                    fill="none"
-                    stroke="currentColor"
-                    // 2dp on a 24dp grid, same derivation as LeftRail: the glyphs beside this render 2 x.
-                    strokeWidth={2.25}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d={item.svg} />
-                  </svg>
+                  // The tab you are on is drawn solid, the way the bottom bar says where you are.
+                  <NavGlyph path={item.svg} filled={item.filled} solid={active} className="size-[29px]" weight={2.25} />
                 )}
               </span>
               {/* The same three rows as the desktop rail. */}
