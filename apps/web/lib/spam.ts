@@ -96,8 +96,11 @@ export function rejectEvent(
   /** The author's profile, from cache, for the name rule. */
   profileOf: (pubkey: Hex) => { name?: string; displayName?: string; nip05?: string } | undefined =
     () => undefined,
+  /** Whether this key is signed in on this device, whose own events no heuristic below may judge. */
+  isOwn: (pubkey: Hex) => boolean = () => false,
 ): boolean {
   if (isSuppressed(event.pubkey)) return true
+  if (isOwn(event.pubkey)) return false
   if (namedSpam.has(event.pubkey)) return true
 
   // The profile event naming itself.

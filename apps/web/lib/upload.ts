@@ -13,7 +13,7 @@ import {
   type UploadResult,
 } from '@nostrich/nostr'
 
-import { blossomServersQuery } from './blossom-servers'
+import { ownBlossomServersQuery } from './own-blossom-servers'
 import { mediaGateMessage, mediaKindOf, type MediaVerdict } from './media-gate'
 import { useMediaGate } from './use-media-gate'
 import { chosenServers } from './media-servers'
@@ -87,11 +87,11 @@ export function useUploads(options: UploadOptions = {}): UploadApi {
         if (chosen.length > 0) return uploadServers(chosen, DEFAULT_BLOSSOM_SERVERS)
 
         /* AN EMPTY ANSWER IS REFETCHED, NEVER TRUSTED FROM CACHE. */
-        const cached = client.getQueryData<string[]>(blossomServersQuery(pubkey).queryKey)
+        const cached = client.getQueryData<string[]>(ownBlossomServersQuery(pubkey).queryKey)
         const mine =
           cached !== undefined && cached.length > 0
             ? cached
-            : await client.fetchQuery(blossomServersQuery(pubkey))
+            : await client.fetchQuery(ownBlossomServersQuery(pubkey))
         return uploadServers(mine, DEFAULT_BLOSSOM_SERVERS)
       } catch {
         // No key, or the relays did not answer.

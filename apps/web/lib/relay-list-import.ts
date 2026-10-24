@@ -6,6 +6,7 @@ import {
   RELAY_LIST_KIND,
   parseRelayList,
   type Hex,
+  type NostrEvent,
   type RelayEntry,
   type RelayUrl,
 } from '@nostrich/nostr'
@@ -28,18 +29,28 @@ export interface ImportedRelays {
 
 /** Fetch the newest kind-10002 for this reader, as a plain list of READ relays. */
 export async function fetchRelayList(pubkey: Hex): Promise<ImportedRelays | null> {
+  return (await fetchPublishedRelays(pubkey)).found
+}
+
+/** The reader's published list, and whether any relay answered at all. */
+export async function fetchPublishedRelays(
+  pubkey: Hex,
+): Promise<{ found: ImportedRelays | null; answered: boolean }> {
   const where = [...getPool().readRelays(), ...DEFAULT_INDEXER_RELAYS] as RelayUrl[]
-  let events
   try {
-    events = await getPool().query(
+    const outcome = await getPool().queryWithStatus(
       [{ kinds: [RELAY_LIST_KIND], authors: [pubkey], limit: 1 }] as never,
       where,
       TIMEOUT_MS,
     )
+    return { found: publishedListFrom(outcome.events), answered: outcome.answered > 0 }
   } catch {
-    return null
+    return { found: null, answered: false }
   }
+}
 
+/** The newest list out of whatever the relays sent. */
+function publishedListFrom(events: readonly NostrEvent[]): ImportedRelays | null {
   // Replaceable, so relays should send one.
   const newest = events.reduce<(typeof events)[number] | undefined>(
     (best, event) => (best === undefined || event.created_at > best.created_at ? event : best),

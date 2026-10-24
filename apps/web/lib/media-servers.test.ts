@@ -38,8 +38,8 @@ describe('uploads honour the author’s own servers', () => {
   })
 
   it('reads that list through the SHARED query, not a second copy of it', () => {
-    // A second definition would drift from the one the image fallback uses, and re-ask.
-    expect(upload).toContain('blossomServersQuery(pubkey)')
+    // The reader's own list has one definition, shared with Settings.
+    expect(upload).toContain('ownBlossomServersQuery(pubkey)')
   })
 
   it('still uploads when the relays cannot be reached', () => {
@@ -115,7 +115,7 @@ describe('uploads no longer trust an hour-old “nothing published”', () => {
 
   it('refetches rather than serving an empty list from cache', () => {
     /* `blossomServersQuery` holds its answer for an hour and caches "nothing published". */
-    expect(upload).toContain('client.fetchQuery(blossomServersQuery(pubkey))')
+    expect(upload).toContain('client.fetchQuery(ownBlossomServersQuery(pubkey))')
   })
 })
 

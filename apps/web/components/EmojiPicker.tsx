@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { useMenuClickAway } from '../lib/dismiss'
 
 /** A small emoji picker, hand-rolled rather than pulled from a package. */
 
@@ -53,21 +54,20 @@ export function EmojiPicker({
   const ref = useRef<HTMLDivElement>(null)
   const [group, setGroup] = useState(0)
 
+  // Armed a tick late, so the click that opened this does not close it again.
+  const [armed, setArmed] = useState(false)
   useEffect(() => {
-    const onClick = (event: MouseEvent): void => {
-      if (ref.current !== null && !ref.current.contains(event.target as Node)) onClose()
-    }
+    const timer = setTimeout(() => setArmed(true), 0)
+    return () => clearTimeout(timer)
+  }, [])
+  useMenuClickAway(() => true, [ref], onClose, armed)
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') onClose()
     }
-    // Deferred a tick: the click that opened this picker is still propagating.
-    const timer = setTimeout(() => document.addEventListener('click', onClick), 0)
     document.addEventListener('keydown', onKey)
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('click', onClick)
-      document.removeEventListener('keydown', onKey)
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
   const active = GROUPS[group] ?? GROUPS[0]

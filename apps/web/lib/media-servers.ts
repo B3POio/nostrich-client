@@ -12,6 +12,7 @@ import {
 } from '@nostrich/nostr'
 
 import { blossomServersQuery } from './blossom-servers'
+import { ownBlossomServersQuery } from './own-blossom-servers'
 import { getPool } from './pool'
 import { readScoped, writeScoped } from './scope'
 
@@ -88,7 +89,7 @@ export function useMediaServers(pubkey: Hex | undefined): MediaServersApi {
       return
     }
     void client
-      .ensureQueryData(blossomServersQuery(pubkey))
+      .ensureQueryData(ownBlossomServersQuery(pubkey))
       .then(found => {
         if (cancelled) return
         setPublished(found)
@@ -161,6 +162,7 @@ export function useMediaServers(pubkey: Hex | undefined): MediaServersApi {
         setPublished([...servers])
         // Every other surface reads this through the same query.
         client.setQueryData(blossomServersQuery(pubkey).queryKey, [...servers])
+        client.setQueryData(ownBlossomServersQuery(pubkey).queryKey, [...servers])
         return 'ok'
       } finally {
         setPublishing(false)

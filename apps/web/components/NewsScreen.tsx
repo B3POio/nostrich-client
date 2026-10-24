@@ -29,6 +29,7 @@ import { Avatar } from './Avatar'
 import { useNowSeconds } from './Clock'
 import { writeScoped } from '../lib/scope'
 import { NEWS_LANGUAGE_KEY as LANGUAGE_KEY } from '../lib/settings-keys'
+import { useMenuClickAway } from '../lib/dismiss'
 
 /** Long-form articles. */
 
@@ -602,21 +603,20 @@ function FilterPanel({
 }): React.ReactNode {
   const ref = useRef<HTMLDivElement>(null)
 
+  // Armed a tick late, so the click that opened this does not close it again.
+  const [armed, setArmed] = useState(false)
   useEffect(() => {
-    const onClick = (event: MouseEvent): void => {
-      if (ref.current !== null && !ref.current.contains(event.target as Node)) onClose()
-    }
+    const timer = setTimeout(() => setArmed(true), 0)
+    return () => clearTimeout(timer)
+  }, [])
+  useMenuClickAway(() => true, [ref], onClose, armed)
+
+  useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') onClose()
     }
-    // Deferred a tick, or the click that opened this closes it again.
-    const timer = setTimeout(() => document.addEventListener('click', onClick), 0)
     document.addEventListener('keydown', onKey)
-    return () => {
-      clearTimeout(timer)
-      document.removeEventListener('click', onClick)
-      document.removeEventListener('keydown', onKey)
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
   return (

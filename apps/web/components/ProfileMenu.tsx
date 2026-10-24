@@ -8,6 +8,7 @@ import { useCustomFeeds } from '../lib/custom-feeds'
 import { npubOf } from '../lib/format'
 import { getPool } from '../lib/pool'
 import { useUserList } from '../lib/user-lists'
+import { useMenuClickAway } from '../lib/dismiss'
 import type { ActionIconName } from '@nostrich/app'
 
 import { FeedEditor } from './FeedEditor'
@@ -36,14 +37,13 @@ export function ProfileMenu({ pubkey }: { pubkey: Hex }): React.ReactNode {
   const [picking, setPicking] = useState(false)
   const [creating, setCreating] = useState(false)
 
-  useEffect(() => {
-    const onClick = (event: MouseEvent): void => {
-      const node = ref.current
-      if (node !== null && node.open && !node.contains(event.target as Node)) node.open = false
-    }
-    document.addEventListener('click', onClick)
-    return () => document.removeEventListener('click', onClick)
-  }, [])
+  useMenuClickAway(
+    () => ref.current?.open === true,
+    [ref],
+    () => {
+      if (ref.current !== null) ref.current.open = false
+    },
+  )
 
   useEffect(() => {
     if (flash === null) return

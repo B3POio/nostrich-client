@@ -71,6 +71,22 @@ function writeCookie(
   document.cookie = `${COOKIE}=${value}; path=/; max-age=${MAX_AGE}; SameSite=Lax`
 }
 
+/** Adopt a published list on load, unless the reader edited theirs here or it is already held. */
+export function adoptPublishedRelays(found: ImportedRelays): boolean {
+  const stored = readCookie()
+  if (stored?.src === 'edited') return false
+  const next = policiesFrom(found.entries)
+  if (
+    stored !== null &&
+    sameRelayList(stored.urls, found.urls) &&
+    samePolicies(stored.policies ?? {}, next, found.urls)
+  ) {
+    return false
+  }
+  writeCookie(found.urls, 'imported', next)
+  return true
+}
+
 export interface RelayPrefs {
   relays: string[]
   /** True when the reader has customised the list, so the UI can offer a reset. */

@@ -8,6 +8,7 @@ import { noteHref } from '../lib/links'
 import { getPool } from '../lib/pool'
 import { usePinnedId, usePinning } from '../lib/pinned'
 import { addToList, inList, toggleList, useUserListsVersion } from '../lib/user-lists'
+import { useMenuClickAway } from '../lib/dismiss'
 import { sessionPubkey, useSession } from './SessionProvider'
 
 /** The ⋯ menu on a single note. */
@@ -19,14 +20,13 @@ export function NoteMenu({ event }: { event: NostrEvent }): React.ReactNode {
   const [flash, setFlash] = useState<{ text: string; seq: number } | null>(null)
   const seq = useRef(0)
 
-  useEffect(() => {
-    const onClick = (clickEvent: MouseEvent): void => {
-      const node = ref.current
-      if (node !== null && node.open && !node.contains(clickEvent.target as Node)) node.open = false
-    }
-    document.addEventListener('click', onClick)
-    return () => document.removeEventListener('click', onClick)
-  }, [])
+  useMenuClickAway(
+    () => ref.current?.open === true,
+    [ref],
+    () => {
+      if (ref.current !== null) ref.current.open = false
+    },
+  )
 
   useEffect(() => {
     if (flash === null) return
