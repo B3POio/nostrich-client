@@ -1,7 +1,9 @@
 'use client'
 
 import { Link } from './AppLink'
-import { resolveTab, tabFromParam, type FeedTabId } from '../lib/feed-tab'
+import { isReplyRow, resolveTab, tabFromParam, type FeedTabId } from '../lib/feed-tab'
+import { useParentLookup } from '../lib/parents'
+import { Threaded } from './Threaded'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -81,15 +83,18 @@ function hrefFor(tab: Exclude<FeedTabId, 'custom' | 'list'>, window?: TrendingWi
 }
 
 /** The second tab is a picker, and what is in it depends on whether the reader. */
-type DiscoverChoice = 'latest' | TrendingWindowId
+type DiscoverChoice = 'latest' | 'replies' | TrendingWindowId
 
 function discoverOptions(signedIn: boolean): { id: DiscoverChoice; label: string }[] {
   const windows = TRENDING_WINDOWS.map(w => ({ id: w.id as DiscoverChoice, label: w.label }))
-  return signedIn ? [{ id: 'latest', label: 'Latest' }, ...windows] : windows
+  return signedIn
+    ? [{ id: 'latest', label: 'Latest' }, { id: 'replies', label: 'Replies' }, ...windows]
+    : windows
 }
 
 function discoverHref(choice: DiscoverChoice): string {
-  return choice === 'latest' ? hrefFor('latest') : hrefFor('trending', choice)
+  if (choice === 'latest' || choice === 'replies') return hrefFor(choice)
+  return hrefFor('trending', choice)
 }
 
 /** Custom feeds carry their id in the URL, so a feed is a link somebody can bookmark. */
@@ -152,7 +157,7 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
   const requested = tabFromParam(searchParams.get('feed'))
 
   // Contacts are loaded both to build the follows feed and to decide the default.
-  const needsFollows = signedIn && (requested === null || requested === 'follows')
+  const needsFollows = signedIn && (requested === null || requested === 'follows' || requested === 'replies')
   const follows = useFollows(needsFollows ? pubkey : undefined)
 
   const trendingWindow = windowFromParam(searchParams.get('w'))
@@ -239,6 +244,9 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
       case 'follows':
         // The reader included.
         return { kind: 'authors', authors: withSelf(stableAuthors, pubkey) }
+      case 'replies':
+        // Everything the people you follow write, replies kept; the screen keeps only the replies.
+        return { kind: 'authors', authors: [...stableAuthors], include: 'all' }
       case 'latest':
         return { kind: 'verified' }
       case 'trending':
@@ -257,7 +265,7 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
 
   // Held back until the follow list lands, otherwise discover flashes in and is torn.
   const waitingOnFollows = needsFollows && follows.loading
-  const followsEmpty = tab === 'follows' && follows.resolved && follows.authors.length === 0
+  const followsEmpty = (tab === 'follows' || tab === 'replies') && follows.resolved && follows.authors.length === 0
   // Same reasoning for custom feeds: subscribing before storage has been read would.
   const waitingOnCustom = requested === 'custom' && !customFeeds.ready
   const waitingOnList = requested === 'list' && !listReady
@@ -273,7 +281,7 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
   // Follows are exempt from every quality rule, deliberately: you decided to follow.
 
   // Custom feeds are exempt for the same reason.
-  const gated = tag !== null || (tab !== 'follows' && tab !== 'custom' && tab !== 'list')
+  const gated = tag !== null || (tab !== 'follows' && tab !== 'replies' && tab !== 'custom' && tab !== 'list')
   // Neither of these is a preference any more.
 
   // Hiding profileless accounts was a toggle, defaulted on, and switching it off.
@@ -375,13 +383,19 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deletedVersion is the signal
   }, [sourceNotes, gate, muted.members, mutedReposts.members, deletedVersion, showHidden, pubkey])
 
+  /** The Replies tab: each reply waits for the note it answers, and is left out when that note is nowhere. */
+  const repliesOnly = tag === null && tab === 'replies'
+  const replyRows = useMemo(() => (repliesOnly ? gatedNotes.filter(isReplyRow) : EMPTY_NOTES), [repliesOnly, gatedNotes])
+  const replyParents = useParentLookup(replyRows)
+
   /** Local counts feed the action row on Latest and Follows. */
   const countTargets = useMemo(() => {
     const rendered = gatedNotes.slice(0, 60).map(countedId)
     const held = feed.pending.slice(0, PREFETCH_COUNTS).map(countedId)
+    const answered = repliesOnly ? [...replyParents.parents.values()].slice(0, 60).map(countedId) : []
     // Deduped: a repost and its original share a counted id, and asking twice.
-    return [...new Set([...rendered, ...held])]
-  }, [tab, gatedNotes, feed.pending])
+    return [...new Set([...rendered, ...held, ...answered])]
+  }, [gatedNotes, feed.pending, repliesOnly, replyParents.parents])
   /* Trending's NUMBERS come from the network-wide index, so this subscription used. */
 
   const { counts: localCounts, zaps: noteZaps } = useInteractions(
@@ -443,6 +457,13 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
     }
     /** A hashtag page is discovery, and the loudest account about a tag must not become. */
     if (tag !== null) return gatedNotes
+    if (repliesOnly) {
+      const hidden = new Set(muted.members)
+      return replyRows.filter(note => {
+        const parent = replyParents.parents.get(note.id)
+        return parent !== undefined && !hidden.has(parent.pubkey)
+      })
+    }
     if (tab !== 'latest') return gatedNotes
     // Latest is discovery too.
     const promotable = gatedNotes.filter(note => isPromotable(displayedNote(note).inner))
@@ -460,16 +481,21 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
     justPublished,
     replyFarms.farmed,
     trendingCounts,
+    repliesOnly,
+    replyRows,
+    replyParents.parents,
+    muted.members,
   ])
 
   // Hashtags for the right rail, taken from what is actually on screen.
   useEffect(() => {
     publishFeedHashtags(visibleNotes)
   }, [visibleNotes])
-  const hiddenCount = sourceNotes.length - visibleNotes.length
+  // The Replies tab leaves posts out on purpose, which is not hiding them.
+  const hiddenCount = repliesOnly ? 0 : sourceNotes.length - visibleNotes.length
   /** How many held notes would ACTUALLY appear if the reader pressed the button. */
   const pendingNotes = useMemo(() => {
-    const accepted = feed.pending.filter(gate.accepts)
+    const accepted = feed.pending.filter(note => gate.accepts(note) && (!repliesOnly || isReplyRow(note)))
     if (accepted.length === 0) return accepted
     /* EVERY step the merge will apply, not just the ones Latest adds. */
     const merged = collapseReposts([...accepted, ...gatedNotes])
@@ -484,7 +510,7 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
           )
     const survivors = new Set(shown.map(note => note.id))
     return accepted.filter(note => survivors.has(note.id))
-  }, [feed.pending, gate, tab, tag, gatedNotes, socialGraph])
+  }, [feed.pending, gate, tab, tag, gatedNotes, socialGraph, repliesOnly])
 
   const pendingCount = pendingNotes.length
   /** THE PILL DOES NOT APPEAR FOR ONE OR TWO NOTES. */
@@ -705,7 +731,8 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
     waitingOnList ||
     gate.settling ||
     trending.loading ||
-    trendingBodiesPending
+    trendingBodiesPending ||
+    (repliesOnly && visibleNotes.length === 0 && replyParents.waiting.size > 0)
 
   return (
     <div>
@@ -758,8 +785,8 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
             {/* Discover first, your own feed second. */}
             <DiscoverTab
               signedIn={signedIn}
-              active={tab === 'trending' || (signedIn && tab === 'latest')}
-              choice={tab === 'latest' ? 'latest' : trendingWindow}
+              active={tab === 'trending' || (signedIn && (tab === 'latest' || tab === 'replies'))}
+              choice={tab === 'latest' || tab === 'replies' ? tab : trendingWindow}
             />
             {signedIn ? (
               <FeedTab href={hrefFor('follows')} label="Following" active={tab === 'follows'} />
@@ -915,18 +942,35 @@ export function FeedScreen({ active = true }: { active?: boolean } = {}): React.
               : ` No recent notes are tagged #${tag}.`}
           </p>
         ) : (
-          rows.map(event => (
+          rows.map((event, index) => {
             // `countedId`, not `event.id`.
-            <NoteCard
-              key={event.id}
-              event={event}
-              counts={counts.get(countedId(event))}
-              zaps={noteZaps.get(countedId(event))}
-              {...(collapsedRows.has(event.id)
-                ? { collapsedFor: collapsedRows.get(event.id) }
-                : {})}
-            />
-          ))
+            const card = (
+              <NoteCard
+                key={event.id}
+                event={event}
+                counts={counts.get(countedId(event))}
+                zaps={noteZaps.get(countedId(event))}
+                {...(collapsedRows.has(event.id)
+                  ? { collapsedFor: collapsedRows.get(event.id) }
+                  : {})}
+              />
+            )
+            if (!repliesOnly) return card
+            const parent = replyParents.parents.get(event.id)
+            // A reply to the reply below it is drawn once, as that one's parent.
+            if (parent === undefined || (index > 0 && replyParents.parents.get(rows[index - 1]?.id ?? '')?.id === event.id)) {
+              return parent === undefined ? card : null
+            }
+            return (
+              <div key={event.id}>
+                {/* The rail runs from the note into the answer, so the two read as one exchange. */}
+                <Threaded connected>
+                  <NoteCard event={parent} counts={counts.get(countedId(parent))} zaps={noteZaps.get(countedId(parent))} />
+                </Threaded>
+                {card}
+              </div>
+            )
+          })
         )}
       </section>
 

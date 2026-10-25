@@ -1,6 +1,8 @@
 /** The feed tab vocabulary, and the rule that decides which one a reader lands. */
+import { KINDS, isReply, type NostrEvent } from '@nostrich/nostr'
 
-export type FeedTabId = 'follows' | 'latest' | 'trending' | 'custom' | 'list'
+/** `replies` is what the people you follow answer, each drawn under the note it answers. */
+export type FeedTabId = 'follows' | 'replies' | 'latest' | 'trending' | 'custom' | 'list'
 
 export function tabFromParam(raw: string | null): FeedTabId | null {
   switch (raw) {
@@ -8,6 +10,8 @@ export function tabFromParam(raw: string | null): FeedTabId | null {
     // The first release spelled it "following".
     case 'following':
       return 'follows'
+    case 'replies':
+      return 'replies'
     case 'trending':
       return 'trending'
     case 'custom':
@@ -49,8 +53,12 @@ export function resolveTab({
   /* An EXPLICIT request always wins, including a signed-out reader asking for Latest. */
   if (requested === 'custom') return customMissing ? fallback : 'custom'
   if (requested === 'list') return listMissing ? fallback : 'list'
-  if (requested === 'follows' && !signedIn) return fallback
+  if ((requested === 'follows' || requested === 'replies') && !signedIn) return fallback
   if (requested !== null) return requested
   return signedIn && hasFollows ? 'follows' : fallback
 }
 
+/** A row the Replies tab draws: a note that answers another, never a plain post, repost or quote. */
+export function isReplyRow(event: NostrEvent): boolean {
+  return event.kind === KINDS.shortNote && isReply(event)
+}

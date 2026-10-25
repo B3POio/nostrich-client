@@ -13,7 +13,7 @@ Your keys are your account. Your notes live on relays anyone can run.
 [![License: MIT](https://img.shields.io/badge/License-MIT-000000.svg?style=flat-square)](LICENSE)
 [![Next.js 15](https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=next.js)](https://nextjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
-[![Tests](https://img.shields.io/badge/tests-2%2C618-2ea043?style=flat-square)](#testing)
+[![Tests](https://img.shields.io/badge/tests-2%2C629-2ea043?style=flat-square)](#testing)
 
 </div>
 
@@ -42,6 +42,7 @@ so every reader is not ranking the network in their own browser.
 
 ### Reading
 - Following, trending and latest feeds
+- A Replies feed: what the people you follow answer, under the note they answer
 - Custom feeds by hashtag and author
 - Threads with reply collapsing
 - Long-form articles (NIP-23)
@@ -251,7 +252,7 @@ pnpm typecheck     # strict, with noUncheckedIndexedAccess
 pnpm test          # every package
 ```
 
-2,618 tests across 211 files. The protocol core is tested against real event fixtures
+2,629 tests across 212 files. The protocol core is tested against real event fixtures
 rather than hand-made ones, because a fixture you wrote yourself only proves
 the parser agrees with itself.
 
