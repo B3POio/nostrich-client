@@ -1,3 +1,5 @@
+import { Suspense } from 'react'
+
 import { EmojiPacksScreen } from '../../components/EmojiPacksScreen'
 
 export const metadata = {
@@ -6,5 +8,10 @@ export const metadata = {
 }
 
 export default function EmojiPage(): React.ReactNode {
-  return <EmojiPacksScreen />
+  // The active tab is read from the URL, so this reads useSearchParams.
+  return (
+    <Suspense fallback={null}>
+      <EmojiPacksScreen />
+    </Suspense>
+  )
 }
